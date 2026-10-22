@@ -1,0 +1,137 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Imbakan</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#101116;color:#f5f5fa;font:15px Arial,sans-serif;padding:18px}
+h1{font-size:34px;margin-bottom:5px}
+p{color:#b5b8c8;line-height:1.5}
+header,.panel{max-width:850px;margin:0 auto 18px}
+header{padding:10px 2px}
+.storage{background:#252d20;border:1px solid #566941;padding:16px;border-radius:14px;margin:18px 0}
+.storage strong{color:#c7ff83;font-size:20px}
+button,.upload{background:#c7ff83;color:#14190e;border:0;border-radius:9px;padding:11px 14px;font-weight:bold;cursor:pointer;display:inline-block}
+.secondary{background:#292b37;color:white}
+.panel{background:#1b1c25;border:1px solid #363846;border-radius:16px;padding:15px}
+#drop{border:2px dashed #62677c;border-radius:14px;text-align:center;padding:25px 12px;margin-top:15px}
+input[type=search],select{width:100%;padding:12px;background:#101116;color:white;border:1px solid #393b49;border-radius:9px;margin:7px 0}
+#files{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:15px}
+.file{background:#13141b;border:1px solid #353745;border-radius:12px;overflow:hidden;min-width:0}
+.preview{height:125px;background:#252738;display:flex;align-items:center;justify-content:center;font-size:40px;overflow:hidden;color:#c7ff83}
+.preview img,.preview video{width:100%;height:100%;object-fit:contain}
+.preview audio{width:95%}
+.info{padding:12px}
+.name{font-weight:bold;overflow-wrap:anywhere;margin-bottom:8px}
+.meta{font-size:12px;color:#b5b8c8;margin-bottom:12px;overflow-wrap:anywhere}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.actions button{font-size:13px;padding:10px 5px}
+.actions .download{grid-column:1/-1;width:100%}
+.delete{background:#49272e;color:#ffdce0}
+#empty{text-align:center;color:#b5b8c8;padding:25px}
+small{color:#aeb2c2;line-height:1.6;display:block;margin-top:15px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Imbakan</h1>
+  <p>Ang sarili mong library para sa files, videos, pictures, music, ZIP at iba pa.</p>
+  <div class="storage">
+    <strong>Unlimited Storage*</strong>
+    <p id="count">0 files saved</p>
+    <p id="space">Library storage</p>
+  </div>
+  <label class="upload" for="picker">＋ Upload Files</label>
+  <input id="picker" type="file" multiple hidden>
+  <div id="drop">
+    <div style="font-size:30px">⇧</div>
+    <b>Mag-upload ng files dito</b>
+    <p>Pindutin ang Upload Files at pumili sa iyong phone.</p>
+  </div>
+</header>
+
+<main class="panel">
+  <h2>Your Files</h2>
+  <input type="search" id="search" placeholder="Search files...">
+  <select id="filter">
+    <option value="all">All files</option>
+    <option value="image">Pictures</option>
+    <option value="video">Videos</option>
+    <option value="audio">Music & Sounds</option>
+    <option value="zip">ZIP & Archives</option>
+    <option value="document">Documents</option>
+    <option value="other">Other files</option>
+  </select>
+  <div id="files"></div>
+  <div id="empty">Wala pang files. Mag-upload muna, boy!</div>
+  <small>*Ang “Unlimited Storage” ay label lamang. Ang totoong kapasidad ay nakadepende sa available storage at browser limits. Maaaring hindi manatili ang files kung browser preview lang ang gamit. Para sa mas maaasahang local saving, buksan ang HTML file sa browser na sumusuporta sa IndexedDB. Mag-download ng backup ng mahahalagang files.</small>
+</main>
+
+<script>
+const picker=document.getElementById('picker');
+const filesBox=document.getElementById('files');
+const empty=document.getElementById('empty');
+let files=[];
+
+function typeOf(f){
+ const n=f.name.toLowerCase(),t=f.type||'';
+ if(t.startsWith('image/')||/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/.test(n))return'image';
+ if(t.startsWith('video/')||/\.(mp4|mkv|avi|mov|webm|3gp)$/.test(n))return'video';
+ if(t.startsWith('audio/')||/\.(mp3|wav|wma|m4a|aac|ogg|flac|mid|midi|kar)$/.test(n))return'audio';
+ if(/\.(zip|rar|7z|tar|gz)$/.test(n))return'zip';
+ if(/\.(pdf|doc|docx|xls|xlsx|ppt|pptx|txt|csv|json)$/.test(n)||t.startsWith('text/'))return'document';
+ return'other';
+}
+function size(n){
+ if(n<1024)return n+' B';
+ if(n<1048576)return(n/1024).toFixed(1)+' KB';
+ if(n<1073741824)return(n/1048576).toFixed(1)+' MB';
+ return(n/1073741824).toFixed(2)+' GB';
+}
+function icon(k){return{image:'▧',video:'▶',audio:'♫',zip:'ZIP',document:'▤',other:'◇'}[k]}
+function render(){
+ const q=document.getElementById('search').value.toLowerCase();
+ const filter=document.getElementById('filter').value;
+ const shown=files.filter(f=>
+  f.name.toLowerCase().includes(q)&&
+  (filter==='all'||typeOf(f)===filter)
+ );
+ document.getElementById('count').textContent=files.length+' files saved';
+ document.getElementById('space').textContent='Selected files: '+size(files.reduce((s,f)=>s+f.size,0));
+ filesBox.innerHTML='';
+ empty.style.display=shown.length?'none':'block';
+ shown.forEach(f=>{
+  const k=typeOf(f),url=URL.createObjectURL(f);
+  const card=document.createElement('article');card.className='file';
+  const preview=document.createElement('div');preview.className='preview';
+  if(k==='image'){const img=document.createElement('img');img.src=url;img.alt=f.name;preview.append(img)}
+  else if(k==='video'){const v=document.createElement('video');v.src=url;v.controls=true;v.preload='metadata';preview.append(v)}
+  else if(k==='audio'){const a=document.createElement('audio');a.src=url;a.controls=true;preview.append(a)}
+  else preview.textContent=icon(k);
+  const info=document.createElement('div');info.className='info';
+  const name=document.createElement('div');name.className='name';name.textContent=f.name;
+  const meta=document.createElement('div');meta.className='meta';meta.textContent=k.toUpperCase()+' · '+size(f.size);
+  const actions=document.createElement('div');actions.className='actions';
+  const open=document.createElement('button');open.className='secondary';open.textContent='Open';
+  open.onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(f);a.target='_blank';a.rel='noopener';a.click()};
+  const del=document.createElement('button');del.className='delete';del.textContent='Delete';
+  del.onclick=()=>{files=files.filter(x=>x!==f);render()};
+  const down=document.createElement('button');down.className='download';down.textContent='↓ Download File';
+  down.onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(f);a.download=f.name;document.body.append(a);a.click();a.remove()};
+  actions.append(open,del,down);info.append(name,meta,actions);card.append(preview,info);filesBox.append(card);
+ });
+}
+picker.addEventListener('change',e=>{files.push(...Array.from(e.target.files));render();picker.value=''});
+document.getElementById('search').addEventListener('input',render);
+document.getElementById('filter').addEventListener('change',render);
+const drop=document.getElementById('drop');
+drop.addEventListener('dragover',e=>{e.preventDefault();drop.style.borderColor='#c7ff83'});
+drop.addEventListener('dragleave',()=>drop.style.borderColor='');
+drop.addEventListener('drop',e=>{e.preventDefault();drop.style.borderColor='';files.push(...Array.from(e.dataTransfer.files));render()});
+</script>
+</body>
+                                                     </html>
+                                                     
